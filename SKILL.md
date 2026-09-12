@@ -1,4 +1,4 @@
-﻿---
+---
 name: video-editor
 description: >-
   Autonomous and interactive video editing workflow. Discovers assets, sets up dedicated project workspace,
@@ -150,5 +150,10 @@ Once approved, directly render the final MP4 using an automated Python + FFmpeg 
    - **Catchy Phrasing:** 2-4 bold words with high curiosity gap (e.g. *"THEY ROAST WHAT?!"*, *"ROASTED CROCODILE?!"*, *"INSANE STREET FOOD!"*).
 2. **Generate Multiple Variations:**
    - **PIL Compositing:** High-contrast, sharp, color-graded frames with bold typography, strokes, drop shadows, and angled polaroid/sticker shock badges.
+   - **Canva MCP Integration (`canva`):**
+     - Launch YouTube thumbnail design workspace in the Canva desktop app: `canva_create_design_in_app(preset='youtube_thumbnail')`.
+     - Or search relevant high-CTR templates: `canva_search_templates(query='travel vlog youtube thumbnail')`.
+     - Create channel banners, end screens, or vertical 9:16 reels covers (`canva_create_design_in_app(preset='instagram_story')`).
+     - Once the user or Canva exports the file, automatically locate and ingest it into `thumbnails/` using `canva_find_recent_exports()`.
    - **Nanobanana Image Generator (`generate_image`):** When stylized promotional posters or hyper-saturated artistic illustrations are requested, supply the candidate frame to `generate_image`.
 3. **Deliver Options:** Present 3-4 distinct 16:9 variations for the user to choose their preferred thumbnail.
