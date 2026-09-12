@@ -1,0 +1,98 @@
+﻿================================================================================
+VIDEO-EDITOR: Autonomous & Interactive Video Editing Skill for AI Agents
+================================================================================
+
+OVERVIEW
+--------------------------------------------------------------------------------
+video-editor is a production-grade agentic skill designed for Google Antigravity
+and modern AI coding/content assistants. It transforms raw multi-camera video
+footage, still photos, and audio into polished, platform-ready travel vlogs,
+documentaries, and YouTube videos.
+
+KEY FEATURES
+--------------------------------------------------------------------------------
+1. Direct FFmpeg Master Rendering:
+   - No heavy desktop video editor or GUI needed.
+   - High-throughput automated rendering directly via FFmpeg pipelines.
+   - EBU R128 broadcast audio normalization (-16 LUFS web target).
+   - Dynamic 1.0-1.2s smooth alpha fade-in/out subtitle transitions.
+
+2. Web-Researched & De-Slopped Subtitles:
+   - Researches real logistics, transit routes, history, and ticket pricing via web search.
+   - Enforces no-ai-slop principles: strictly strips AI buzzwords ("nestled",
+     "tapestry", "bustling oasis") and bans camera meta-jargon ("protagonist", "hero").
+   - High-contrast color palette: Thai Gold (#FFD700), Cyan (#00E5FF),
+     Amber (#FFA500), and Pure White (#FFFFFF).
+
+3. Human-in-the-Loop Review:
+   - Automatically generates numbered visual picture boards (picture_board.jpg)
+     and contact sheets (storyboard.jpg).
+   - Generates plan.md for easy user review and iterative refinement before rendering.
+
+4. High-CTR YouTube Thumbnails:
+   - Authentic protagonist zoom (preserving real facial features from raw footage).
+   - Shock-factor badges (exotic food, unique animals, bold curiosity hooks).
+   - High-contrast typography with PIL compositing + optional Nanobanana AI styling.
+
+THE 6-STEP WORKFLOW
+--------------------------------------------------------------------------------
+Step 1: Asset Discovery & Dedicated Workspace
+        Scans raw video/photo assets and sets up a dedicated folder inside
+        D:\gemini\<project_name>\ with renders/, storyboards/, and thumbnails/.
+
+Step 2: Interactive Discovery Interview
+        Quizzes user on narrative brief, target duration, platform (16:9 vs 9:16),
+        and must-include highlights.
+
+Step 3: Planning, Web Research & Visual Previews
+        Computes uncut runtime & cut ratios, researches trivia, creates picture_board.jpg
+        and storyboard.jpg, and generates plan.md.
+
+Step 4: User Review & Iterative Refinement
+        User reviews plan.md and visual boards; agent iterates until explicit user approval.
+
+Step 5: Direct Master Video Rendering
+        FFmpeg automated pipeline executes color grading, audio normalization,
+        act transitions, and animated subtitles.
+
+Step 6: High-CTR YouTube Thumbnail Suite
+        Extracts key candidate frames, adds catchy typography and shock elements,
+        delivering 3-4 distinct options.
+
+SYSTEM PREREQUISITES
+--------------------------------------------------------------------------------
+- Python 3.10+
+- FFmpeg & FFprobe (must be in system PATH)
+- Python Packages:
+  pip install -r requirements.txt
+  (Pillow, opencv-python, numpy)
+
+INSTALLATION IN ANTIGRAVITY
+--------------------------------------------------------------------------------
+Clone this repository directly into your project's .agents/skills/ directory:
+
+  cd <your-project-root>
+  git clone https://github.com/dev13-31/skill-video-editor.git .agents/skills/video-editor
+
+Or install globally into your Antigravity skills configuration:
+  git clone https://github.com/dev13-31/skill-video-editor.git ~/.gemini/antigravity-cli/skills/video-editor
+
+FILE STRUCTURE
+--------------------------------------------------------------------------------
+video-editor/
+├── SKILL.md                 # Agent skill instructions & YAML frontmatter
+├── README.md                # Markdown documentation for GitHub web interface
+├── read-me.txt              # Plaintext documentation
+├── LICENSE                  # Open-source license (MIT)
+├── requirements.txt         # Python dependencies
+├── .gitignore               # Ignored build, cache, and media files
+├── scripts/                 # Core Python utilities
+│   ├── contact_sheet.py     # Visual contact sheet & picture board generator
+│   ├── quality_analyzer.py  # Blurry frame, static shot & duration analyzer
+│   └── audio_processor.py   # Audio normalization & voiceover alignment
+└── references/              # Cheatsheets & FFmpeg recipes
+    └── ffmpeg_recipes.md    # Filtergraph recipes for transitions & drawtext
+
+LICENSE
+--------------------------------------------------------------------------------
+Distributed under the MIT License. See LICENSE for more information.
