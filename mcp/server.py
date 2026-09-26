@@ -4,7 +4,11 @@ Exposes automated video editing tools:
 - Scanning & metadata filtering
 - Visual contact sheet generation
 - Blur & motion quality scoring
-- Audio normalization & voiceover alignment
+- Multilingual Speech-to-Text (STT) & word timestamps (faster-whisper)
+- Synchronized animated subtitles (.ass karaoke & active-word highlight)
+- Subtitle burning into video (FFmpeg libass)
+- Speech & silence auto-cutting (jump-cut creation)
+- Multi-stage audio enhancement (de-rumble, FFT noise suppression, vocal EQ, EBU R128 loudness)
 - OpenShot .osp project compilation
 - Export rendering
 """
@@ -39,12 +43,14 @@ try:
     import quality_analyzer
     import audio_processor
     import openshot_builder
+    import speech_transcriber
+    import auto_cutter
 except ImportError:
     pass
 
 server = MCPServer(
     name="video-editor",
-    instructions="Video editing assistant tools for scanning footage, analyzing quality, generating contact sheets, aligning audio, creating OpenShot projects, and rendering exports."
+    instructions="Video editing assistant tools for scanning footage, analyzing quality, multilingual speech transcription (STT), synchronized animated subtitles, silence/speech cutting, audio enhancement/normalization, and rendering exports."
 )
 
 
@@ -102,7 +108,6 @@ def video_extract_frame(
 
 
 @server.tool()
-
 def video_generate_contact_sheet(
     video_path: str,
     output_path: str = "",
@@ -168,6 +173,188 @@ def video_analyze_quality(
 
     res = quality_analyzer.analyze_blur_and_static(video_path, blur_threshold=blur_threshold, static_threshold=static_threshold)
     return json.dumps(res, indent=2)
+
+
+@server.tool()
+def video_transcribe_audio(
+    media_path: str,
+    model_size: str = "base",
+    language: str = "",
+    task: str = "transcribe",
+    aspect_ratio: str = "16:9",
+    style_mode: str = "highlight",
+    words_per_card: int = 4,
+    highlight_color_hex: str = "#FFD700"
+) -> str:
+    """
+    Transcribes audio or video speech using faster-whisper with word-level timestamps.
+    Supports multilingual recognition (English, Hindi, Spanish, etc.), auto language detection,
+    and exports JSON, SRT, VTT, and synchronized animated ASS subtitles.
+    """
+    if not os.path.exists(media_path):
+        return json.dumps({"error": f"Media '{media_path}' not found."})
+
+    lang = language.strip() if language.strip() else None
+
+    try:
+        res = speech_transcriber.run_full_stt_pipeline(
+            media_path=media_path,
+            model_size=model_size,
+            language=lang,
+            aspect_ratio=aspect_ratio,
+            style_mode=style_mode,
+            words_per_card=words_per_card,
+            highlight_color_hex=highlight_color_hex
+        )
+        return json.dumps(res, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"STT transcription failed: {str(e)}"})
+
+
+@server.tool()
+def video_generate_animated_subtitles(
+    transcript_json_path: str,
+    output_ass_path: str = "",
+    style_mode: str = "highlight",
+    aspect_ratio: str = "16:9",
+    words_per_card: int = 4,
+    primary_color_hex: str = "#FFFFFF",
+    highlight_color_hex: str = "#FFD700",
+    font_name: str = "",
+    font_size: int = 0
+) -> str:
+    r"""
+    Generates synchronized animated ASS subtitles from an existing transcript JSON.
+    Modes:
+      - 'highlight': Spoken words dynamically pop into highlight_color (e.g. Bright Gold).
+      - 'karaoke': Smooth left-to-right sweep color fill (\\kf tags).
+      - 'clean': Punchy synchronized cards.
+    """
+    if not os.path.exists(transcript_json_path):
+        return json.dumps({"error": f"Transcript JSON '{transcript_json_path}' not found."})
+
+    try:
+        with open(transcript_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        words = data.get("words", [])
+        if not words:
+            return json.dumps({"error": "No word timestamps found in transcript JSON."})
+
+        lang = data.get("detected_language", "en")
+        
+        if not output_ass_path:
+            p = Path(transcript_json_path)
+            output_ass_path = str(p.parent / f"{p.stem.replace('_transcript', '')}_animated.ass")
+
+        fn = font_name.strip() if font_name.strip() else None
+
+        res_path = speech_transcriber.generate_animated_ass_subtitles(
+            words=words,
+            output_path=output_ass_path,
+            language=lang,
+            style_mode=style_mode,
+            aspect_ratio=aspect_ratio,
+            words_per_card=words_per_card,
+            font_name=fn,
+            font_size=font_size,
+            primary_color_hex=primary_color_hex,
+            highlight_color_hex=highlight_color_hex
+        )
+        return json.dumps({"status": "success", "ass_path": res_path})
+    except Exception as e:
+        return json.dumps({"error": f"Animated subtitle generation failed: {str(e)}"})
+
+
+@server.tool()
+def video_burn_subtitles(video_path: str, subtitle_path: str, output_path: str = "", crf: int = 18) -> str:
+    """
+    Burns ASS or SRT subtitles permanently into a video using FFmpeg libass filter.
+    """
+    if not os.path.exists(video_path) or not os.path.exists(subtitle_path):
+        return json.dumps({"error": "Video or Subtitle file does not exist."})
+
+    if not output_path:
+        stem = Path(video_path).stem
+        output_path = str(Path(video_path).parent / f"{stem}_subtitled.mp4")
+
+    try:
+        out = speech_transcriber.burn_subtitles_to_video(video_path, subtitle_path, output_path, crf=crf)
+        return json.dumps({"status": "success", "burned_video_path": out})
+    except Exception as e:
+        return json.dumps({"error": f"Subtitle burning failed: {str(e)}"})
+
+
+@server.tool()
+def video_auto_cut_silence(
+    input_media: str,
+    output_media: str = "",
+    silence_thresh_db: float = -30.0,
+    min_silence_sec: float = 0.5,
+    pad_margin_sec: float = 0.12,
+    render_video: bool = True
+) -> str:
+    """
+    Detects speech and silence intervals, prunes dead air, creates a jump-cut manifest,
+    and optionally renders the tightly-cut video with seamless audio transitions.
+    """
+    if not os.path.exists(input_media):
+        return json.dumps({"error": f"Media '{input_media}' not found."})
+
+    out_m = output_media.strip() if output_media.strip() else None
+
+    try:
+        res = auto_cutter.auto_cut_video_pipeline(
+            input_media=input_media,
+            output_media=out_m,
+            silence_thresh_db=silence_thresh_db,
+            min_silence_sec=min_silence_sec,
+            pad_margin_sec=pad_margin_sec,
+            render=render_video
+        )
+        return json.dumps(res, indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Auto-cut failed: {str(e)}"})
+
+
+@server.tool()
+def video_enhance_audio(
+    input_media: str,
+    output_media: str = "",
+    mode: str = "full_mastering",
+    target_lufs: float = -16.0,
+    denoise_amount: float = 12.0,
+    presence_boost_db: float = 3.0
+) -> str:
+    """
+    Applies multi-stage audio enhancement to vocal and video audio tracks.
+    Modes:
+      - 'full_mastering': Highpass (80Hz rumble cut) + Lowpass (12kHz hiss cut) +
+        FFT de-noise (afftdn) + Vocal presence EQ (2.5kHz boost) +
+        Dynamic leveling (dynaudnorm) + EBU R128 loudness (loudnorm).
+      - 'voice_clarity': Highpass + Vocal presence EQ + Dynamic leveling + EBU R128.
+      - 'denoise_only': Highpass + FFT de-noise + EBU R128.
+      - 'normalize_only': Dynamic leveling + EBU R128.
+    """
+    if not os.path.exists(input_media):
+        return json.dumps({"error": f"Input media '{input_media}' not found."})
+
+    if not output_media:
+        p = Path(input_media)
+        output_media = str(p.parent / f"{p.stem}_enhanced{p.suffix}")
+
+    try:
+        out = audio_processor.enhance_audio(
+            input_media=input_media,
+            output_media=output_media,
+            mode=mode,
+            target_lufs=target_lufs,
+            denoise_amount=denoise_amount,
+            presence_boost_db=presence_boost_db
+        )
+        return json.dumps({"status": "success", "enhanced_audio_path": str(out)})
+    except Exception as e:
+        return json.dumps({"error": f"Audio enhancement failed: {str(e)}"})
 
 
 @server.tool()
